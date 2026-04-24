@@ -478,6 +478,28 @@
     font-family: 'DM Mono', monospace;
   }
 
+  .csv-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .csv-btn:hover {
+    background: var(--green);
+    border-color: var(--green);
+    color: #1a1640;
+  }
+
   /* ── LIGHTBOX ── */
   .lightbox {
     display: none;
@@ -634,6 +656,7 @@
           <button class="filter-btn active" data-filter="all">All</button>
           <button class="filter-btn" data-filter="image">Photos</button>
           <button class="filter-btn" data-filter="video">Videos</button>
+          <button class="csv-btn" id="csv-btn" title="Завантажити CSV">⬇ CSV</button>
         </div>
       </div>
       <div class="media-grid" id="media-grid">
@@ -708,6 +731,12 @@ function tempColor(t) {
   if (t < 10) return '#a78bfa';
   if (t < 20) return '#4ade80';
   return '#f97316';
+}
+
+function tempBadge(t) {
+  if (t < 5)  return ' <span title="Дуже холодно" style="font-size:1em;">🥶</span>';
+  if (t > 15) return ' <span title="Дуже жарко"   style="font-size:1em;">🔥</span>';
+  return '';
 }
 
 // ── LOGIN ────────────────────────────────────────────────
@@ -970,7 +999,7 @@ function showChartTooltip(record, cx, cy, svgW, svgH) {
     }
   }
   html += `<div class="chart-tooltip-info">
-    <strong>${record.temperature}°C</strong>
+    <strong>${record.temperature}°C${tempBadge(record.temperature)}</strong>
     time: ${formatTime(record.timestamp)}<br/>
     date: ${formatDate(record.timestamp)}
   </div>`;
@@ -1043,7 +1072,7 @@ function renderMedia(records, filter) {
       ${mediaPart}
       <div class="media-info">
         <div class="media-info-row">
-          <span class="media-temp">${r.temperature}°C</span>
+          <span class="media-temp">${r.temperature}°C${tempBadge(r.temperature)}</span>
           <span class="media-type-badge ${r.event_type}">${r.event_type}</span>
         </div>
         <div class="media-time">${formatTime(r.timestamp)} · ${formatDate(r.timestamp)}</div>
@@ -1071,7 +1100,7 @@ function openLightbox(idx) {
     vid.style.display = 'block';
   }
 
-  meta.innerHTML = `<strong>${r.temperature}°C</strong> &nbsp;·&nbsp; ${formatTime(r.timestamp)}, ${formatDate(r.timestamp)} &nbsp;·&nbsp; <span style="color:var(--accent2)">${r.device_id}</span>`;
+  meta.innerHTML = `<strong>${r.temperature}°C${tempBadge(r.temperature)}</strong> &nbsp;·&nbsp; ${formatTime(r.timestamp)}, ${formatDate(r.timestamp)} &nbsp;·&nbsp; <span style="color:var(--accent2)">${r.device_id}</span>`;
 
   lb.classList.add('show');
 }
@@ -1086,6 +1115,31 @@ function closeLightbox() {
   document.getElementById('lightbox').classList.remove('show');
   document.getElementById('lightbox-video').pause?.();
 }
+
+// ── CSV EXPORT ────────────────────────────────────────────
+document.getElementById('csv-btn').addEventListener('click', () => {
+  if (!allRecords.length) return;
+
+  const headers = ['timestamp', 'device_id', 'temperature', 'event_type', 'file_url'];
+  const rows = allRecords.map(r => headers.map(h => {
+    const val = r[h] ?? '';
+    // Якщо значення містить кому або лапки — обернути в лапки
+    return String(val).includes(',') || String(val).includes('"')
+      ? `"${String(val).replace(/"/g, '""')}"`
+      : String(val);
+  }).join(','));
+
+  const csv = [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const deviceId = document.getElementById('device-select').value || 'data';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `birdcam_${deviceId}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 // ── RESIZE chart ─────────────────────────────────────────
 window.addEventListener('resize', () => {
